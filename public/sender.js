@@ -16,7 +16,7 @@ window.sendFile = async function () {
   linkDOM.innerHTML = `Share this link: <a href="${shareLink}" target="_blank">${baseUrl}/receive?id=${sessionId}</a>`;
 
   const copyBtn = document.getElementById("copy");
-  copyBtn.style.display = "visible";
+  copyBtn.style.display = "inline-block";
 
   copyBtn.onclick = () => {
     navigator.clipboard.writeText(shareLink);
