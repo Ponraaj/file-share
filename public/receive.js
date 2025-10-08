@@ -9,7 +9,8 @@ if (!sessionId) {
 let rtc = new RTCPeerConnection({
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
 });
-let ws = new WebSocket(`ws://${location.host}`);
+const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+let ws = new WebSocket(`${protocol}://${location.host}`);
 
 let filename = "received-file";
 let mimeType = "application/octet-stream";

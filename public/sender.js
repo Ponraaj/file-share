@@ -18,7 +18,8 @@ window.sendFile = async function () {
     iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
   });
   dc = rtc.createDataChannel("file");
-  ws = new WebSocket(`ws://${location.host}`);
+  const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${protocol}://${location.host}`);
 
   dc.onopen = () => {
     dc.send(
