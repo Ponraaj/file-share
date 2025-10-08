@@ -1,5 +1,6 @@
 const urlParams = new URLSearchParams(window.location.search);
 const sessionId = urlParams.get("id");
+const clientId = crypto.randomUUID();
 
 if (!sessionId) {
   document.getElementById("status").textContent = "No session ra dei";
@@ -18,12 +19,12 @@ let receivedChunks = [];
 let gotMeta = false;
 
 ws.onopen = () => {
-  ws.send(JSON.stringify({ id: sessionId }));
+  ws.send(JSON.stringify({ sessionId, clientId }));
 };
 
 rtc.onicecandidate = ({ candidate }) => {
   if (candidate) {
-    ws.send(JSON.stringify({ type: "ice", ice: candidate }));
+    ws.send(JSON.stringify({ type: "ice", ice: candidate, to: "sender" }));
   }
 };
 
@@ -78,7 +79,7 @@ ws.onmessage = async ({ data }) => {
     const answer = await rtc.createAnswer();
     await rtc.setLocalDescription(answer);
 
-    ws.send(JSON.stringify({ type: "answer", sdp: answer }));
+    ws.send(JSON.stringify({ type: "answer", sdp: answer, to: msg.from }));
   } else if (msg.type === "ice") {
     await rtc.addIceCandidate(msg.ice);
   }

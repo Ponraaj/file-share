@@ -1,8 +1,8 @@
 import { serve, type ServerWebSocket } from "bun";
 
-type WSData = { id: string };
+type WSData = { sessionId: string; clientId: string };
 
-const peers = new Map<string, ServerWebSocket<WSData>[]>();
+const sessions = new Map<string, Map<string, ServerWebSocket<WSData>>>();
 
 serve({
   port: 6969,
@@ -13,14 +13,14 @@ serve({
     const url = new URL(req.url);
     let path = url.pathname;
 
-
     if (path === "/") path = "/sender.html";
     else if (path === "/receive") path = "/receive.html";
-    else if(path.startsWith("/.well-known")) return new Response(null,{status:204})
+    else if (path.startsWith("/.well-known"))
+      return new Response(null, { status: 204 });
 
     try {
       const file = Bun.file(`./public${path}`);
-      return new Response(file)
+      return new Response(file);
     } catch (error) {
       return new Response("Not Found", { status: 404 });
     }
@@ -32,42 +32,38 @@ serve({
     message(ws: ServerWebSocket<WSData>, raw) {
       const msg = JSON.parse(raw.toString());
 
-      if (!ws.data?.id && msg.id) {
-        ws.data = { id: msg.id };
-        if (!peers.has(msg.id)) peers.set(msg.id, []);
-        peers.get(msg.id)!.push(ws);
+      if (!ws.data?.sessionId && msg.sessionId && msg.clientId) {
+        ws.data = { sessionId: msg.sessionId, clientId: msg.clientId };
+        if (!sessions.has(msg.sessionId))
+          sessions.set(msg.sessionId, new Map());
+        sessions.get(msg.sessionId)!.set(msg.clientId, ws);
 
-        const others = peers.get(msg.id)!.filter((p) => p !== ws);
-        for (const peer of others) {
-          if (peer.readyState === WebSocket.OPEN) {
-            peer.send(JSON.stringify({ type: "ready" }));
+        for (const [id, peer] of sessions.get(msg.sessionId)!) {
+          if (id !== msg.clientId && peer.readyState === WebSocket.OPEN) {
+            peer.send(JSON.stringify({ type: "ready", from: msg.clientId }));
           }
         }
 
-        console.log(`joined room ${msg.id}`);
-        return;
+        console.log(`joined room ${msg.sessionId}`);
       }
 
-      const id = ws.data?.id;
-      if (!id || !peers.has(id)) return;
-
-      for (const peer of peers.get(id) ?? []) {
-        if (peer !== ws && peer.readyState === WebSocket.OPEN) {
-          peer.send(raw);
+      if (ws.data?.sessionId && msg.to) {
+        const target = sessions.get(ws.data.sessionId)?.get(msg.to);
+        if (target && target.readyState === WebSocket.OPEN) {
+          target.send(JSON.stringify({ ...msg, from: ws.data.clientId }));
         }
       }
     },
 
     close(ws: ServerWebSocket<WSData>) {
-      const id = ws.data?.id;
-      if (!id || !peers.has(id)) return;
+      const { sessionId, clientId } = ws.data || {};
+      if (!sessionId || !clientId) return;
 
-      const remainingPeers = peers.get(id)!.filter((p) => p !== ws);
-      if (remainingPeers.length > 0) {
-        peers.set(id, remainingPeers);
-      } else {
-        peers.delete(id);
-      }
+      const session = sessions.get(sessionId);
+      if (!session) return;
+
+      session.delete(clientId);
+      if (session.size === 0) sessions.delete(sessionId);
 
       console.log(`disconnected`);
     },
