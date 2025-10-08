@@ -19,12 +19,13 @@ RUN bun build index.ts \
     --target=bun-linux-x64-baseline \
  && chmod +x /app/server-app
 
-FROM alpine:latest
-
-RUN apk add --no-cache libstdc++ libgcc
+FROM scratch
 
 WORKDIR /app
 
+COPY --from=builder /lib/ld-musl-*.so.1 /lib/
+COPY --from=builder /usr/lib/libgcc_s.so.1 /usr/lib/
+COPY --from=builder /usr/lib/libstdc++.so.6 /usr/lib/
 COPY --from=builder /app/server-app ./server-app
 COPY --from=builder /app/public ./public
 
