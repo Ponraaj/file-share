@@ -1,11 +1,8 @@
 import { serve, type ServerWebSocket } from "bun";
-import { join } from "path";
-import { existsSync } from "fs";
 
 type WSData = { id: string };
 
 const peers = new Map<string, ServerWebSocket<WSData>[]>();
-const publicDir = join(import.meta.dir, "../public");
 
 serve({
   port: 6969,
@@ -16,15 +13,17 @@ serve({
     const url = new URL(req.url);
     let path = url.pathname;
 
+
     if (path === "/") path = "/sender.html";
     else if (path === "/receive") path = "/receive.html";
+    else if(path.startsWith("/.well-known")) return new Response(null,{status:204})
 
-    const filePath = join(publicDir, decodeURIComponent(path));
-    if (!existsSync(filePath)) {
+    try {
+      const file = Bun.file(`./public${path}`);
+      return new Response(file)
+    } catch (error) {
       return new Response("Not Found", { status: 404 });
     }
-
-    return new Response(Bun.file(filePath));
   },
 
   websocket: {
